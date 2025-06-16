@@ -1,0 +1,9 @@
+services:
+  mensajero:
+    build: .
+    container_name: estanteria-bot
+    restart: unless-stopped
+    volumes:
+      - /home/misper/estanteria-bot-data:/app/data
+    environment:
+      - TOKEN
