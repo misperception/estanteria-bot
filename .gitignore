@@ -1,0 +1,7 @@
+/.env
+/.venv/
+/members.json
+/server.json
+/comisiones.json
+/.idea/
+*__pycache__/

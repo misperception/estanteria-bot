@@ -1,0 +1,32 @@
+[
+  {
+    "nombre": "Café",
+    "precio": 1,
+    "descripcion": "Cafeína."
+  },
+  {
+    "nombre": "Esclavitud",
+    "precio": 3,
+    "descripcion": "Esclaviza a un plebeyo."
+  },
+  {
+    "nombre": "Liberación",
+    "precio": 3,
+    "descripcion": "Libera a un maldito esclavo."
+  },
+  {
+    "nombre": "Investigación del DIC",
+    "precio": 4,
+    "descripcion": "Paga al DIC para que investiguen a alguien por ti (solo una investigación a la vez)."
+  },
+  {
+    "nombre": "Senador honorario",
+    "precio": 8,
+    "descripcion": "Adquiere y saborea derechos durante 1 día (solo 2 senadores a la vez)."
+  },
+  {
+    "nombre": "Comisión",
+    "precio": "X",
+    "descripcion": "Soborna a un artista para que dibuje por ti. Precio variable."
+  }
+]
