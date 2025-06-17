@@ -1,0 +1,20 @@
+name: Docker Host
+
+on:
+  push:
+    branches: [ main ]
+jobs:
+  run:
+    runs-on: self-hosted
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run
+        run: docker compose up -d --build
+        env:
+          TOKEN: ${{ secrets.TOKEN }}
+
+      - name: Prune
+        run: docker image prune -f
