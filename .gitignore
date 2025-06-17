@@ -4,4 +4,7 @@
 /server.json
 /comisiones.json
 /.idea/
-*__pycache__/
+/__pycache__/
+/data/
+/cogs/__pycache__/
+/lib/__pycache__/

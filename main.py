@@ -25,9 +25,10 @@ async def on_ready():
         except commands.ExtensionFailed:
             print("No se ha podido cargar el módulo.")
 
-    init_file("members.json")
-    init_file("server.json")
-    init_file("comisiones.json")
+    os.makedirs("data", exist_ok=True)
+    init_file("data/members.json")
+    init_file("data/server.json")
+    init_file("data/comisiones.json")
     await bot.tree.sync()
     print("Bot Online")
 

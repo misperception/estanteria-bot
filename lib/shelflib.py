@@ -57,13 +57,13 @@ class Server(Writeable):
         self.senadores_honorarios = 0
         self.investigaciones = 0
 
-    def write_to_json(self, path: str = "server.json"):
+    def write_to_json(self, path: str = "data/server.json"):
         super().write_to_json(path)
 
     @classmethod
     def read_from_json(cls, guild: discord.Guild):
         obj = cls(guild.id)
-        s = cls._read_from_json(obj=obj, id=guild.id, path="server.json")
+        s = cls._read_from_json(obj=obj, id=guild.id, path="data/server.json")
         if s is None:
             s = cls(guild.id)
             s.write_to_json()
@@ -87,14 +87,14 @@ class Member(Writeable):
         }
         self.admin = (({e.id for e in member.roles} & set(server.roles_admin))!= set()) if member and server else False
 
-    def write_to_json(self, path: str = "members.json"):
+    def write_to_json(self, path: str = "data/members.json"):
         super().write_to_json(path)
 
     @classmethod
     def read_from_json(cls, member: discord.Member):
         obj = cls(None, None)
         obj.id = member.id
-        m = cls._read_from_json(obj=obj, id=member.id, path="members.json")
+        m = cls._read_from_json(obj=obj, id=member.id, path="data/members.json")
         if m is None:
             s = Server.read_from_json(member.guild)
             m = cls(member, s)
@@ -140,16 +140,16 @@ class Commission(Writeable):
         self.msg = 0
         self.artist = 0
 
-    def write_to_json(self, path: str = "comisiones.json"):
+    def write_to_json(self, path: str = "data/comisiones.json"):
         super().write_to_json(path)
 
     @classmethod
     def read_from_json(cls, id: int):
         obj = cls(id, '', 0)
-        c = cls._read_from_json(obj=obj, id=id, path="comisiones.json")
+        c = cls._read_from_json(obj=obj, id=id, path="data/comisiones.json")
         return c
 
-    def remove_from_json(self, path: str = "comisiones.json"):
+    def remove_from_json(self, path: str = "data/comisiones.json"):
         super().remove_from_json(path)
 
 
