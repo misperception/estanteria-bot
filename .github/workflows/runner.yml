@@ -11,8 +11,14 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Build
+        run: docker build -t estanteria-bot:latest .
+
+      - name: Push
+        run: docker push misperception/estanteria-bot:latest
+
       - name: Run
-        run: docker compose up -d --build
+        run: docker compose up -d
         env:
           TOKEN: ${{ secrets.TOKEN }}
 

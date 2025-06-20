@@ -1,6 +1,6 @@
 services:
   mensajero:
-    build: .
+    image: estanteria-bot:latest
     container_name: estanteria-bot
     restart: unless-stopped
     volumes:
