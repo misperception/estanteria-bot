@@ -15,7 +15,9 @@ jobs:
         run: docker build -t misperception/estanteria-bot:latest .
 
       - name: Push
-        run: docker push misperception/estanteria-bot:latest
+        run: |
+          docker login -u misperception -p ${{ secrets.DOCKER_PASS }}
+          docker push misperception/estanteria-bot:latest
 
       - name: Run
         run: docker compose up -d
