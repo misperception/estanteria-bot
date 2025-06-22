@@ -1,11 +1,9 @@
-import datetime
-
 from lib.checks import *
 
 # Carga de secretos
 TOKEN = os.getenv('TOKEN')
 PREFIX = '!'
-VERSION = "1.01-bugfix"
+VERSION = "1.1"
 UP_DATE: datetime.datetime
 
 # Setup de intents (permisos disponibles al bot)
@@ -17,7 +15,7 @@ intents.members = True
 bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 
 @bot.hybrid_command(name="info", description="Devuelve información sobre el bot.")
-async def version(ctx: commands.Context):
+async def info(ctx: commands.Context):
     global UP_DATE
     embed = discord.Embed(
         title="Información",
