@@ -1,4 +1,5 @@
 from lib.checks import *
+import random
 
 # Menú de acción del artista
 class ArtistView(discord.ui.View):
@@ -205,9 +206,11 @@ class Tienda(commands.Cog):
     @buy.command(name="café", description="Cafeína.")
     @has_coupons(1)
     async def cafe(self, ctx: commands.Context):
+        fun_val = random.randint(1,100)
         victima = Member.read_from_json(ctx.author)
         victima.modify_coupons(-1)
-        await ctx.send("Café.", ephemeral=True, silent=True, delete_after=.001)
+        await ctx.send(f"{"En estos momentos la máquina de café está rota, por favor vuelva a intentarlo." 
+        if fun_val == 100 else ":coffee:"}", ephemeral=True)
 
     @buy.command(name="esclavitud", description="Esclaviza a un plebeyo.")
     @discord.app_commands.describe(member="Miembro a esclavizar.")
