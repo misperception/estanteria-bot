@@ -105,12 +105,6 @@ class Cupones(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    # Check de canal bancario
-    async def cog_check(self, ctx: commands.Context):
-        s = Server.read_from_json(ctx.guild)
-        if not ctx.channel.id == s.canal_bancario: raise InappropriateChannel
-        return True
-
     # Comando que permite añadir cupones
     @commands.hybrid_command(name="cuponizar", description="Añade cupones a un miembro.")
     @discord.app_commands.describe(
@@ -148,7 +142,7 @@ class Cupones(commands.Cog):
         giver.modify_coupons(-amount)
         gived.modify_coupons(amount, ctx.guild)
         await ctx.reply(f"Transferido{"s" if amount > 1 else ""} {amount} cup{"ones" if amount > 1 else "ón"}"
-                        + f" de la cuenta de {ctx.author.mention} a la cuenta de {member.mention}")
+                        + f" de la cuenta de {ctx.author.mention} a la cuenta de {member.mention}", ephemeral=True)
 
     # Comando que lista todos los cupones de los miembros
     @owner_only()
@@ -233,7 +227,7 @@ class Tienda(commands.Cog):
         asyncio.create_task(
             self._desesclavizar(member, time=(time - datetime.datetime.now()).total_seconds()),
             name=f"{member.id}-slave")
-        await ctx.reply(f"Ahora {member.mention} es un esclavo. Qué asco.")
+        await ctx.reply(f"Ahora {member.mention} es un esclavo. Qué asco.", ephemeral=True)
 
     # Función auxiliar asíncrona para desesclavizar, se puede llamar sola o ejecutar mediante asyncio
     async def _desesclavizar(self, member: discord.Member, time: float = 0):
@@ -260,7 +254,7 @@ class Tienda(commands.Cog):
         user = Member.read_from_json(ctx.author)
         user.modify_coupons(-3, ctx.guild)
         await self._desesclavizar(member)
-        await ctx.reply(f"{member.mention} es libre, qué pena...")
+        await ctx.reply(f"{member.mention} es libre, qué pena...", ephemeral=True)
 
     @buy.command(name="senador", description="Adquiere y saborea derechos durante 1 día (solo 2 senadores a la vez).")
     @has_coupons(8)
@@ -275,7 +269,7 @@ class Tienda(commands.Cog):
         s = Server.read_from_json(member.guild)
         # Si hay ya 2 senadores honorarios, no puede haber más
         if not s.senadores_honorarios < 2:
-            await ctx.reply("Ya hay más que suficientes plebeyos con síndrome de superioridad, largo de aquí.")
+            await ctx.reply("Ya hay más que suficientes plebeyos con síndrome de superioridad, largo de aquí.", ephemeral=True)
             return
         val = m.senador["status"]
         # Si ya eres senador honorario, conténtate
@@ -293,7 +287,7 @@ class Tienda(commands.Cog):
         asyncio.create_task(
             self._desprivilegiar(member, time=datetime.timedelta(days=1).total_seconds()),
             name=f"{member.id}-senador")
-        await ctx.reply("Felicidades por tus derechos recién adquiridos.")
+        await ctx.reply("Felicidades por tus derechos recién adquiridos.", ephemeral=True)
 
     # Función auxiliar asíncrona para quitar privilegios de senador, se llama mediante asyncio
     async def _desprivilegiar(self, member: discord.Member, time: float):
