@@ -1,9 +1,9 @@
-from discord.ext import commands
-from lib.shelflib import *
+from lib.checks import *
 
 # Carga de secretos
 TOKEN = os.getenv('TOKEN')
 PREFIX = '!'
+VERSION = "1.01-bugfix"
 
 # Setup de intents (permisos disponibles al bot)
 intents = discord.Intents.default()
@@ -12,6 +12,10 @@ intents.members = True
 
 # Setup del cliente del bot
 bot = commands.Bot(command_prefix=PREFIX, intents=intents)
+
+@bot.command(name="version", description="Devuelve la versión del bot.")
+async def version(ctx: commands.Context):
+    await ctx.reply(f"Mensajero - versión {VERSION}", ephemeral=True)
 
 # Logging del bot
 @bot.event

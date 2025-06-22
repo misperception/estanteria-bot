@@ -1,5 +1,3 @@
-import discord
-
 from lib.checks import *
 
 # Menú de acción del artista
@@ -161,6 +159,7 @@ class Cupones(commands.Cog):
 
     # Comando que lista todos los cupones de los miembros
     @commands.hybrid_command(name="listar", description="Lista los cupones de todos los miembros del server.")
+    # todo: si len(data) > 15 entonces mandar varias embeds (por limitaciones de discord)
     async def list(self, ctx: commands.Context):
         # Creación del esqueleto del embed
         embed = discord.Embed(
@@ -168,7 +167,7 @@ class Cupones(commands.Cog):
             color=discord.Color.green(),
             timestamp=datetime.datetime.now()
         )
-        data = read_json("members.json")
+        data = read_json("data/members.json")
 
         # Creación de campos por cada usuario
         for key, val in data.items():
