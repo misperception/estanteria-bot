@@ -104,9 +104,12 @@ class Member(Writeable):
         return m
 
     # Método para hacer transacción de cupones
-    def modify_coupons(self, amount: int):
+    def modify_coupons(self, amount: int, guild: discord.Guild = None):
         self.cupones += amount
         self.write_to_json()
+        if guild:
+            self.cancel_member_task("refresh")
+            asyncio.create_task(refresh_list(guild), name=f"{self.id}-refresh")
 
     def change_status(self, tag, mode: bool, end: datetime.datetime | None = None):
         if mode:
@@ -173,3 +176,29 @@ def read_json(path: str):
     with open(path, 'r') as file:
         data = json.load(file)
     return data
+
+# Método auxiliar para generar la lista de cupones
+def generate_list(guild: discord.Guild):
+    embeds = []
+    data = read_json("data/members.json")
+    items = list(data.items())
+    # Inicialización de los embeds
+    for i in range(len(items)//25 + 1):
+        # Creación del esqueleto del embed
+        embeds.append(discord.Embed(
+            title="Guydocupones",
+            color=discord.Color.green(),
+            timestamp=datetime.datetime.now()
+        ))
+    # Creación de campos por cada usuario
+    for i in range(len(items)):
+        key, val = items[i]
+        embeds[i//25].add_field(name=guild.get_member(int(key)).display_name, value=val["cupones"], inline=False)
+    return embeds
+
+# Método auxiliar para refrescar la lista de cupones
+async def refresh_list(guild: discord.Guild):
+    s = Server.read_from_json(guild)
+    if s.lista_cupones == 0: return
+    msg = await guild.get_channel(s.canal_bancario).fetch_message(s.lista_cupones)
+    await msg.edit(embeds=generate_list(guild))

@@ -29,7 +29,7 @@ class ArtistView(discord.ui.View):
             await asyncio.sleep(1)
 
         # Paga al artista el precio de la comisión y modifica el mensaje original de la comisión
-        artist.modify_coupons(com.reward)
+        artist.modify_coupons(com.reward, guild=self.channel.guild)
         message = await self.channel.fetch_message(com.msg)
         await message.reply("Comisión completada.", delete_after=2)
         embed = message.embeds[0]
@@ -72,7 +72,7 @@ class CommissionView(discord.ui.View):
             await interaction.response.send_message("Pero a ti qué te pasa, ¡esta comisión no es tuya!")
         com = Commission.read_from_json(self.id)
         user = Member.read_from_json(interaction.guild.get_member(self.id))
-        user.modify_coupons(com.reward)
+        user.modify_coupons(com.reward, interaction.guild)
         com.remove_from_json()
         await interaction.response.send_message("Comisión cancelada.", ephemeral=True, delete_after=2)
         await interaction.message.delete()
@@ -111,26 +111,6 @@ class Cupones(commands.Cog):
         if not ctx.channel.id == s.canal_bancario: raise InappropriateChannel
         return True
 
-    # Método auxiliar para generar/refrescar la lista de cupones
-    def refresh_list(self, guild: discord.Guild):
-        embeds = []
-        data = read_json("data/members.json")
-        items = list(data.items())
-
-        # Inicialización de los embeds
-        for i in range(len(items)//25 + 1):
-            # Creación del esqueleto del embed
-            embeds.append(discord.Embed(
-                title="Guydocupones",
-                color=discord.Color.green(),
-                timestamp=datetime.datetime.now()
-            ))
-        # Creación de campos por cada usuario
-        for i in range(len(items)):
-            key, val = items[i]
-            embeds[i//25].add_field(name=guild.get_member(int(key)).display_name, value=val["cupones"], inline=False)
-        return embeds
-
     # Comando que permite añadir cupones
     @commands.hybrid_command(name="cuponizar", description="Añade cupones a un miembro.")
     @discord.app_commands.describe(
@@ -141,7 +121,7 @@ class Cupones(commands.Cog):
     @owner_only()
     async def add_coupons(self, ctx: commands.Context, member: discord.Member, amount: int, mostrar: bool = True):
         m = Member.read_from_json(member)
-        m.modify_coupons(amount)
+        m.modify_coupons(amount, ctx.guild)
         if mostrar: await ctx.reply(
             f"{"Añadidos" if amount > 0 else "Retirados"} {abs(amount)} cupones {"a" if amount > 0 else "de"} la cuenta de {member.mention}")
         else: await ctx.reply("Hecho.", ephemeral=True, delete_after=2)
@@ -165,17 +145,20 @@ class Cupones(commands.Cog):
         if giver.cupones < amount: raise InsufficientCoupons
         gived = Member.read_from_json(member)
         giver.modify_coupons(-amount)
-        gived.modify_coupons(amount)
+        gived.modify_coupons(amount, ctx.guild)
         await ctx.reply(f"Transferido{"s" if amount > 1 else ""} {amount} cup{"ones" if amount > 1 else "ón"}"
                         + f" de la cuenta de {ctx.author.mention} a la cuenta de {member.mention}")
 
     # Comando que lista todos los cupones de los miembros
     @owner_only()
     @commands.hybrid_command(name="listar", description="Lista los cupones de todos los miembros del server.")
-    # todo: cambiar comportamiento para que se refresque automáticamente (en Member.modify_coupons())
     async def create_list(self, ctx: commands.Context):
         s = Server.read_from_json(ctx.guild)
-        embeds = self.refresh_list(ctx.guild)
+        if s.lista_cupones != 0:
+            msg = ctx.guild.get_channel(s.canal_bancario).get_partial_message(s.lista_cupones)
+            await msg.delete()
+
+        embeds = generate_list(ctx.guild)
         message = await ctx.reply(embeds=embeds)
         s.lista_cupones = message.id
         s.write_to_json()
@@ -214,7 +197,7 @@ class Tienda(commands.Cog):
     async def cafe(self, ctx: commands.Context):
         fun_val = random.randint(1,100)
         victima = Member.read_from_json(ctx.author)
-        victima.modify_coupons(-1)
+        victima.modify_coupons(-1, ctx.guild)
         await ctx.send(f"{"En estos momentos la máquina de café está rota, por favor vuelva a intentarlo." 
         if fun_val == 100 else ":coffee:"}", ephemeral=True)
 
@@ -231,7 +214,7 @@ class Tienda(commands.Cog):
         s = Server.read_from_json(member.guild)
         # Cobramos la transacción
         user = Member.read_from_json(ctx.author)
-        user.modify_coupons(-3)
+        user.modify_coupons(-3, ctx.guild)
         # Iniciamos la fecha de hoy para saber la fecha de final de esclavitud
         time = datetime.datetime.now()
         # Comprobamos si el usuario ya es un esclavo para cargar la fecha de final
@@ -274,7 +257,7 @@ class Tienda(commands.Cog):
             await ctx.reply("Ese ya está liberado, que no te enteras.", ephemeral=True)
             return
         user = Member.read_from_json(ctx.author)
-        user.modify_coupons(amount=-3)
+        user.modify_coupons(-3, ctx.guild)
         await self._desesclavizar(member)
         await ctx.reply(f"{member.mention} es libre, qué pena...")
 
@@ -300,7 +283,7 @@ class Tienda(commands.Cog):
             return
         # Cobramos al usuario y le hacemos senador
         user = Member.read_from_json(ctx.author)
-        user.modify_coupons(-8)
+        user.modify_coupons(-8, ctx.guild)
         s.senadores_honorarios += 1
         s.write_to_json()
         m.change_status(m.senador, True, end=(datetime.datetime.now() + datetime.timedelta(days=1)))
@@ -329,7 +312,7 @@ class Tienda(commands.Cog):
         if user.cupones < price: raise InsufficientCoupons
         if price <= 0: raise InvalidPrice
         # Cobramos la comisión temporalmente
-        user.modify_coupons(-price)
+        user.modify_coupons(-price, ctx.guild)
         com = Commission(user.id, prompt, price)
 
         # Embed de la comisión
