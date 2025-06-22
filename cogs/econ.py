@@ -142,6 +142,7 @@ class Cupones(commands.Cog):
     @discord.app_commands.describe(member="El otro plebeyo al que regalar tus cupones", amount="Cupones a regalar")
     async def transfer(self, ctx, member: discord.Member, amount: int):
         giver = Member.read_from_json(ctx.author)
+        if amount < 0: raise InvalidPrice
         if giver.cupones < amount: raise InsufficientCoupons
         gived = Member.read_from_json(member)
         giver.modify_coupons(-amount)
