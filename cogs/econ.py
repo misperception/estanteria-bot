@@ -1,5 +1,5 @@
 from lib.checks import *
-import random
+import random, discord
 
 # Menú de acción del artista
 class ArtistView(discord.ui.View):
@@ -111,6 +111,26 @@ class Cupones(commands.Cog):
         if not ctx.channel.id == s.canal_bancario: raise InappropriateChannel
         return True
 
+    # Método auxiliar para generar/refrescar la lista de cupones
+    def refresh_list(self, guild: discord.Guild):
+        embeds = []
+        data = read_json("data/members.json")
+        items = list(data.items())
+
+        # Inicialización de los embeds
+        for i in range(len(items)//25 + 1):
+            # Creación del esqueleto del embed
+            embeds.append(discord.Embed(
+                title="Guydocupones",
+                color=discord.Color.green(),
+                timestamp=datetime.datetime.now()
+            ))
+        # Creación de campos por cada usuario
+        for i in range(len(items)):
+            key, val = items[i]
+            embeds[i//25].add_field(name=guild.get_member(int(key)).display_name, value=val["cupones"], inline=False)
+        return embeds
+
     # Comando que permite añadir cupones
     @commands.hybrid_command(name="cuponizar", description="Añade cupones a un miembro.")
     @discord.app_commands.describe(
@@ -149,31 +169,17 @@ class Cupones(commands.Cog):
         await ctx.reply(f"Transferido{"s" if amount > 1 else ""} {amount} cup{"ones" if amount > 1 else "ón"}"
                         + f" de la cuenta de {ctx.author.mention} a la cuenta de {member.mention}")
 
-    # Comando que muestra cupones de un usuario
-    @commands.hybrid_command(name="mostrar", description="Muestra los cupones de un usuario.")
-    @discord.app_commands.describe(member="Miembro a mostrar")
-    async def show(self, ctx: commands.Context, member: discord.Member):
-        m = Member.read_from_json(member)
-        cupones = m.cupones
-        await ctx.reply(f"{member.mention} tiene {cupones} Guydocup{"ón" if cupones == 1 else "ones"}.")
-        return
-
     # Comando que lista todos los cupones de los miembros
+    @owner_only()
     @commands.hybrid_command(name="listar", description="Lista los cupones de todos los miembros del server.")
-    # todo: si len(data) > 15 entonces mandar varias embeds (por limitaciones de discord)
-    async def list(self, ctx: commands.Context):
-        # Creación del esqueleto del embed
-        embed = discord.Embed(
-            title="Guydocupones",
-            color=discord.Color.green(),
-            timestamp=datetime.datetime.now()
-        )
-        data = read_json("data/members.json")
+    # todo: cambiar comportamiento para que se refresque automáticamente (en Member.modify_coupons())
+    async def create_list(self, ctx: commands.Context):
+        s = Server.read_from_json(ctx.guild)
+        embeds = self.refresh_list(ctx.guild)
+        message = await ctx.reply(embeds=embeds)
+        s.lista_cupones = message.id
+        s.write_to_json()
 
-        # Creación de campos por cada usuario
-        for key, val in data.items():
-            embed.add_field(name=ctx.guild.get_member(int(key)).display_name, value=val["cupones"])
-        await ctx.reply(embed=embed)
 
 class Tienda(commands.Cog):
     def __init__(self, bot):

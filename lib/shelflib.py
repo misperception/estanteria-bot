@@ -41,6 +41,7 @@ class Server(Writeable):
     rol_senador: int
     rol_esclavo: int
     rol_artista: int
+    lista_cupones: int
     senadores_honorarios: int
     investigaciones: int
 
@@ -54,6 +55,7 @@ class Server(Writeable):
         self.rol_senador = 0
         self.rol_esclavo = 0
         self.rol_artista = 0
+        self.lista_cupones = 0
         self.senadores_honorarios = 0
         self.investigaciones = 0
 
