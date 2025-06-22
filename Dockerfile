@@ -15,6 +15,7 @@ COPY --from=builder /root/.local /root/.local
 COPY cogs cogs
 COPY lib lib
 COPY *.json .
+COPY main.py .
 
 # Carga las dependencias en PATH
 ENV PATH=/root/.local/bin:$PATH
