@@ -1,4 +1,5 @@
 from lib.checks import *
+from discord.ext import tasks
 import random, discord
 
 # Menú de acción del artista
@@ -322,6 +323,42 @@ class Tienda(commands.Cog):
         com.write_to_json()
         await ctx.reply("Comisión mandada.", ephemeral=True, delete_after=2)
 
+
+class Salario(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.salario.start()
+
+    def cog_unload(self):
+        self.salario.cancel()
+
+    @tasks.loop(hours=7*24)
+    async def salario(self):
+        print("Pagando...")
+        servers = read_json("data/server.json")
+        members = read_json("data/members.json")
+        # Ineficiente si se tienen varios servidores, reemplazar por un O(n) con un atributo "guilds" en Member. Innecesario de momento
+        for guild_id in servers:
+            guild = self.bot.get_guild(int(guild_id))
+            for member_id in members:
+                member = guild.get_member(int(member_id))
+                if member is None: continue
+                m = Member.read_from_json(member)
+                m.modify_coupons(m.salario)
+            await refresh_list(guild)
+
+    @salario.before_loop
+    async def wait_for_time(self):
+        # Cuando se inicia el bot, espera al primer día de pago
+        now = datetime.datetime.now()
+        date = (now + datetime.timedelta(days=7-now.weekday())).date()
+        diff = datetime.datetime.combine(date=date, time=now.time().replace(hour=10, minute=0, second=0)) - now
+        print(diff.total_seconds())
+        await asyncio.sleep(diff.total_seconds())
+
+
+
 async def setup(bot):
     await bot.add_cog(Cupones(bot))
     await bot.add_cog(Tienda(bot))
+    await bot.add_cog(Salario(bot))
