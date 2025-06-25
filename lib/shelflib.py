@@ -21,7 +21,8 @@ class Writeable:
         write_json(data, path)
 
     @classmethod
-    def _read_from_json(cls, obj, id: int, path: str):
+    def _read_from_json(cls, obj, path: str):
+        id = obj.id
         data = read_json(path)
         if not str(id) in data:
             return None
@@ -65,7 +66,7 @@ class Server(Writeable):
     @classmethod
     def read_from_json(cls, guild: discord.Guild):
         obj = cls(guild.id)
-        s = cls._read_from_json(obj=obj, id=guild.id, path="data/server.json")
+        s = cls._read_from_json(obj=obj, path="data/server.json")
         if s is None:
             s = cls(guild.id)
             s.write_to_json()
@@ -78,6 +79,7 @@ class Member(Writeable):
     slave: {bool, int}
     senador: {bool, int}
     admin: bool
+    salario: int
 
     def __init__(self, member: discord.Member | None, server: Server | None):
         super().__init__(member.id if member else 0)
@@ -88,15 +90,16 @@ class Member(Writeable):
             "end": None
         }
         self.admin = (({e.id for e in member.roles} & set(server.roles_admin))!= set()) if member and server else False
+        salarios = [salario for id, salario in server.sueldos.items() if int(id) in [rol.id for rol in member.roles]]
+        self.salario = max(salarios) if salarios != [] else 0
 
     def write_to_json(self, path: str = "data/members.json"):
         super().write_to_json(path)
 
     @classmethod
     def read_from_json(cls, member: discord.Member):
-        obj = cls(None, None)
-        obj.id = member.id
-        m = cls._read_from_json(obj=obj, id=member.id, path="data/members.json")
+        obj = cls(member, Server.read_from_json(member.guild))
+        m = cls._read_from_json(obj=obj, path="data/members.json")
         if m is None:
             s = Server.read_from_json(member.guild)
             m = cls(member, s)
@@ -163,13 +166,11 @@ def init_file(path: str):
     if os.path.isfile(path): return
     write_json({}, path)
 
-
 # Función auxiliar para escribir al JSON
 def write_json(data, path: str):
     s = json.dumps(data, indent=4)
     with open(path, 'w') as file:
         file.write(s)
-
 
 # Función auxiliar para leer del JSON
 def read_json(path: str):
