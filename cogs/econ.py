@@ -17,7 +17,8 @@ class ArtistView(discord.ui.View):
     async def send(self, interaction: discord.Interaction, button: discord.ui.Button):
         # Inicia los datos del artista y la comisión
         com = Commission.read_from_json(self.com_id)
-        artist = Member.read_from_json(interaction.user)
+        guild = self.channel.guild
+        artist = Member.read_from_json(guild.get_member(interaction.user.id))
         # Desactiva el botón de enviar y espera a que se envíe la comisión
         button.disabled = True
         await interaction.message.edit(content=interaction.message.content, view=self)
@@ -353,7 +354,6 @@ class Salario(commands.Cog):
         now = datetime.datetime.now()
         date = (now + datetime.timedelta(days=7-now.weekday())).date()
         diff = datetime.datetime.combine(date=date, time=now.time().replace(hour=10, minute=0, second=0)) - now
-        print(diff.total_seconds())
         await asyncio.sleep(diff.total_seconds())
 
 
