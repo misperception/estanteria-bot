@@ -1,106 +1,6 @@
 from lib.checks import *
 from discord.ext import tasks
-import random, discord
-
-# Menú de acción del artista
-class ArtistView(discord.ui.View):
-    com_id: int
-    channel: discord.TextChannel
-    def __init__(self, com_id: int, channel: discord.TextChannel, message: discord.Message):
-        super().__init__()
-        self.com_id = com_id
-        com = Commission.read_from_json(com_id)
-        self.channel = channel
-        self.add_item(discord.ui.Button(label="Ir a la comisión", style=discord.ButtonStyle.link, url=message.jump_url))
-
-    @discord.ui.button(label="Enviar comisión", style=discord.ButtonStyle.green)
-    async def send(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Inicia los datos del artista y la comisión
-        com = Commission.read_from_json(self.com_id)
-        guild = self.channel.guild
-        artist = Member.read_from_json(guild.get_member(interaction.user.id))
-        # Desactiva el botón de enviar y espera a que se envíe la comisión
-        button.disabled = True
-        await interaction.message.edit(content=interaction.message.content, view=self)
-
-        await self.channel.send(f"{interaction.user.mention}, responde a este mensaje con la comisión.", delete_after=10)
-        while not (self.channel.last_message is not None and
-                   self.channel.last_message.attachments != [] and
-                   "image" in self.channel.last_message.attachments[0].content_type and
-                   self.channel.last_message.author.id == artist.id):
-            await asyncio.sleep(1)
-
-        # Paga al artista el precio de la comisión y modifica el mensaje original de la comisión
-        artist.modify_coupons(com.reward, guild=self.channel.guild)
-        message = await self.channel.fetch_message(com.msg)
-        await message.reply("Comisión completada.", delete_after=2)
-        embed = message.embeds[0]
-        embed.set_footer(text="Comisión completada")
-        await message.edit(content=message.content, embed=embed, view=None)
-
-        # Elimina la comisión del JSON y el menú de acción
-        com.remove_from_json()
-        await interaction.message.delete()
-
-    @discord.ui.button(label="Abandonar comisión", style=discord.ButtonStyle.red)
-    async def abandon(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Elimina los datos del artista y lo guarda en el JSON
-        com = Commission.read_from_json(self.com_id)
-        com.taken = False
-        com.artist = 0
-        com.write_to_json()
-
-        # Responde al usuario
-        await interaction.response.send_message("Comisión abandonada.", delete_after=2)
-
-        # Elimina el campo de "Artista" y restablece el menú de la comisión
-        message = await self.channel.fetch_message(com.msg)
-        embed = message.embeds[0]
-        embed.remove_field(1)
-        view = CommissionView(com.id)
-        await message.edit(content=message.content, embed=embed, view=view)
-        # Borra el menú de acción del artista
-        await interaction.message.delete()
-# Menú de acción de la comisión
-class CommissionView(discord.ui.View):
-    def __init__(self, id):
-        super().__init__()
-        self.id = id
-
-    # Botón de cancelar comisión
-    @discord.ui.button(label="Cancelar comisión", style=discord.ButtonStyle.red)
-    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.id:
-            await interaction.response.send_message("Pero a ti qué te pasa, ¡esta comisión no es tuya!")
-        com = Commission.read_from_json(self.id)
-        user = Member.read_from_json(interaction.guild.get_member(self.id))
-        user.modify_coupons(com.reward, interaction.guild)
-        com.remove_from_json()
-        await interaction.response.send_message("Comisión cancelada.", ephemeral=True, delete_after=2)
-        await interaction.message.delete()
-        return
-
-    @discord.ui.button(label="Coger comisión", style=discord.ButtonStyle.blurple)
-    async def take_commission(self, interaction: discord.Interaction, button: discord.ui.Button):
-        server = Server.read_from_json(interaction.guild)
-        if not interaction.user.get_role(server.rol_artista):
-            await interaction.response.send_message(NotArtist().response(), ephemeral=True)
-            return
-
-        com = Commission.read_from_json(self.id)
-        com.artist = interaction.user.id
-        com.taken = True
-        com.write_to_json()
-
-        embed = interaction.message.embeds[0]
-        embed.add_field(name="Artista", value=interaction.user.mention)
-        button.disabled = True
-        await interaction.message.edit(content=interaction.message.content, embed=embed, view=self)
-
-        view = ArtistView(com.id, interaction.channel, interaction.message)
-        await interaction.response.send_message("Comisión cogida.", ephemeral=True, delete_after=2)
-        await interaction.user.send(f"Menú de acción de la comisión *'{com.prompt}'*:", view=view)
-
+import random, discord, views.comisiones
 
 
 class Cupones(commands.Cog):
@@ -303,14 +203,13 @@ class Tienda(commands.Cog):
 
     @buy.command(name="comisión", description="Soborna a un artista para que dibuje por ti. Precio variable.")
     @discord.app_commands.describe(price="Precio de la comisión.", prompt="Detalles de la comisión.")
-    @has_commission()
+    # todo: cambiar el logging de las comisiones para catalogar por id del mensaje
     async def comision(self, ctx: commands.Context, price: int, prompt: str):
         user = Member.read_from_json(ctx.author)
         if user.cupones < price: raise InsufficientCoupons
         if price <= 0: raise InvalidPrice
         # Cobramos la comisión temporalmente
         user.modify_coupons(-price, ctx.guild)
-        com = Commission(user.id, prompt, price)
 
         # Embed de la comisión
         com_embed = discord.Embed(title=f"'{prompt}'", timestamp=datetime.datetime.now())
@@ -318,10 +217,12 @@ class Tienda(commands.Cog):
         com_embed.add_field(name="Precio", value=f"{price} Guydocup{"ones" if price > 1 else "ón"}")
 
         # Creamos el menú de acción de la comisión
-        view=CommissionView(user.id)
-        message = await ctx.send(embed=com_embed, view=view)
-        com.msg = message.id
+        message = await ctx.send(embed=com_embed)
+        view = views.comisiones.CommissionView(message.id)
+        com = Commission(id=message.id, prompt=prompt, reward=price, author=user.id)
         com.write_to_json()
+
+        await message.edit(embed=com_embed, view=view)
         await ctx.reply("Comisión mandada.", ephemeral=True, delete_after=2)
 
 

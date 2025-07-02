@@ -14,6 +14,7 @@ COPY --from=builder /root/.local /root/.local
 # Copia los archivos necesarios
 COPY cogs cogs
 COPY lib lib
+COPY views views
 COPY *.json .
 COPY main.py .
 
