@@ -23,18 +23,23 @@ class ArtistView(discord.ui.View):
         button.disabled = True
         await interaction.message.edit(content=interaction.message.content, view=self)
 
-        await self.channel.send(f"{interaction.user.mention}, responde a este mensaje con la comisión.", delete_after=10)
-        while not (self.channel.last_message is not None and
-                   self.channel.last_message.attachments != [] and
-                   "image" in self.channel.last_message.attachments[0].content_type and
-                   self.channel.last_message.author.id == artist.id):
+        await self.channel.send(f"{interaction.user.mention}, responde al mensaje de la comisión con la comisión completada.", delete_after=10)
+        reply = self.channel.last_message
+        while (    reply is None or
+                   reply.attachments == [] or
+                   "image" not in reply.attachments[0].content_type or
+                   reply.author.id != artist.id or
+                   reply.reference is None or
+                   reply.reference.message_id != com.id):
             await asyncio.sleep(1)
+            reply = self.channel.last_message
 
         # Paga al artista el precio de la comisión y modifica el mensaje original de la comisión
         artist.modify_coupons(com.reward, guild=self.channel.guild)
         message = await self.channel.fetch_message(com.id)
         await message.reply("Comisión completada.", delete_after=2)
         embed = message.embeds[0]
+        embed.set_image(url=reply.attachments[0].url)
         embed.set_footer(text="Comisión completada")
         await message.edit(content=message.content, embed=embed, view=None)
 

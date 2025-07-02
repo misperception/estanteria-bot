@@ -203,7 +203,6 @@ class Tienda(commands.Cog):
 
     @buy.command(name="comisión", description="Soborna a un artista para que dibuje por ti. Precio variable.")
     @discord.app_commands.describe(price="Precio de la comisión.", prompt="Detalles de la comisión.")
-    # todo: cambiar el logging de las comisiones para catalogar por id del mensaje
     async def comision(self, ctx: commands.Context, price: int, prompt: str):
         user = Member.read_from_json(ctx.author)
         if user.cupones < price: raise InsufficientCoupons
