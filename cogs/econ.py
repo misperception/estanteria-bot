@@ -17,7 +17,7 @@ class Cupones(commands.Cog):
     @owner_only()
     async def add_coupons(self, ctx: commands.Context, member: discord.Member, amount: int, mostrar: bool = True):
         m = Member.read_from_json(member)
-        m.modify_coupons(amount, ctx.guild)
+        m.modify_coupons(amount)
         if mostrar: await ctx.reply(
             f"{"Añadidos" if amount > 0 else "Retirados"} {abs(amount)} cupones {"a" if amount > 0 else "de"} la cuenta de {member.mention}")
         else: await ctx.reply("Hecho.", ephemeral=True, delete_after=2)
@@ -42,7 +42,7 @@ class Cupones(commands.Cog):
         if giver.cupones < amount: raise InsufficientCoupons
         gived = Member.read_from_json(member)
         giver.modify_coupons(-amount)
-        gived.modify_coupons(amount, ctx.guild)
+        gived.modify_coupons(amount)
         await ctx.reply(f"Transferido{"s" if amount > 1 else ""} {amount} cup{"ones" if amount > 1 else "ón"}"
                         + f" de la cuenta de {ctx.author.mention} a la cuenta de {member.mention}", ephemeral=True)
 
@@ -94,7 +94,7 @@ class Tienda(commands.Cog):
     async def cafe(self, ctx: commands.Context):
         fun_val = random.randint(1,100)
         victima = Member.read_from_json(ctx.author)
-        victima.modify_coupons(-1, ctx.guild)
+        victima.modify_coupons(-1)
         await ctx.send(f"{"En estos momentos la máquina de café está rota, por favor vuelva a intentarlo." 
         if fun_val == 100 else ":coffee:"}", ephemeral=True)
 
@@ -111,7 +111,7 @@ class Tienda(commands.Cog):
         s = Server.read_from_json(member.guild)
         # Cobramos la transacción
         user = Member.read_from_json(ctx.author)
-        user.modify_coupons(-3, ctx.guild)
+        user.modify_coupons(-3)
         # Iniciamos la fecha de hoy para saber la fecha de final de esclavitud
         time = datetime.datetime.now()
         # Comprobamos si el usuario ya es un esclavo para cargar la fecha de final
@@ -154,7 +154,7 @@ class Tienda(commands.Cog):
             await ctx.reply("Ese ya está liberado, que no te enteras.", ephemeral=True)
             return
         user = Member.read_from_json(ctx.author)
-        user.modify_coupons(-3, ctx.guild)
+        user.modify_coupons(-3)
         await self._desesclavizar(member)
         await ctx.reply(f"{member.mention} es libre, qué pena...", ephemeral=True)
 
@@ -180,7 +180,7 @@ class Tienda(commands.Cog):
             return
         # Cobramos al usuario y le hacemos senador
         user = Member.read_from_json(ctx.author)
-        user.modify_coupons(-8, ctx.guild)
+        user.modify_coupons(-8)
         s.senadores_honorarios += 1
         s.write_to_json()
         m.change_status(m.senador, True, end=(datetime.datetime.now() + datetime.timedelta(days=1)))
@@ -208,7 +208,7 @@ class Tienda(commands.Cog):
         if user.cupones < price: raise InsufficientCoupons
         if price <= 0: raise InvalidPrice
         # Cobramos la comisión temporalmente
-        user.modify_coupons(-price, ctx.guild)
+        user.modify_coupons(-price)
 
         # Embed de la comisión
         com_embed = discord.Embed(title=f"'{prompt}'", timestamp=datetime.datetime.now())
@@ -223,6 +223,16 @@ class Tienda(commands.Cog):
 
         await message.edit(embed=com_embed, view=view)
         await ctx.reply("Comisión mandada.", ephemeral=True, delete_after=2)
+
+    @has_coupons(4)
+    @investigation_not_available()
+    @buy.command(name="investigación", description="Paga al DIC para que investiguen a alguien por ti (solo una investigación a la vez).")
+    async def investigacion(self, ctx: commands.Context, member: discord.Member, reason: str):
+        if member == ctx.guild.owner:
+            await ctx.reply("No veo razones para investigar a este honorable individuo.")
+            return
+        comprador = Member.read_from_json(member)
+        comprador.modify_coupons(-4)
 
 
 class Salario(commands.Cog):

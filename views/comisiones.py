@@ -35,7 +35,7 @@ class ArtistView(discord.ui.View):
             reply = self.channel.last_message
 
         # Paga al artista el precio de la comisión y modifica el mensaje original de la comisión
-        artist.modify_coupons(com.reward, guild=self.channel.guild)
+        artist.modify_coupons(com.reward)
         message = await self.channel.fetch_message(com.id)
         await message.reply("Comisión completada.", delete_after=2)
         embed = message.embeds[0]
@@ -83,7 +83,7 @@ class CommissionView(discord.ui.View):
             await interaction.response.send_message("Pero a ti qué te pasa, ¡esta comisión no es tuya!")
 
         user = Member.read_from_json(interaction.guild.get_member(com.author))
-        user.modify_coupons(com.reward, interaction.guild)
+        user.modify_coupons(com.reward)
         com.remove_from_json()
         await interaction.response.send_message("Comisión cancelada.", ephemeral=True, delete_after=2)
         await interaction.message.delete()

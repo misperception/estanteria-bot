@@ -74,6 +74,7 @@ class Server(Writeable):
 
 # Clase miembro con los datos requeridos
 class Member(Writeable):
+    guild: discord.Guild
     id: int
     cupones: int
     slave: {bool, int}
@@ -81,39 +82,52 @@ class Member(Writeable):
     admin: bool
     salario: int
 
-    def __init__(self, member: discord.Member | None, server: Server | None):
+    def __init__(self, member: discord.Member):
         super().__init__(member.id if member else 0)
+        server = Server.read_from_json(member.guild)
+        self.guild = member.guild
         self.cupones = 0
-        self.slave = {"status": False, "end": 0}
-        self.senador = {
-            "status": member.get_role(server.rol_senador) is not None if member and server else False,
-            "end": None
+        self.slave = {
+            "status": member.get_role(server.rol_esclavo) is not None,
+            "end": 0
         }
-        self.admin = (({e.id for e in member.roles} & set(server.roles_admin))!= set()) if member and server else False
+        self.senador = {
+            "status": member.get_role(server.rol_senador) is not None,
+            "end": 0
+        }
+        self.admin = (({e.id for e in member.roles} & set(server.roles_admin))!= set())
         salarios = [salario for id, salario in server.sueldos.items() if int(id) in [rol.id for rol in member.roles]]
         self.salario = max(salarios) if salarios != [] else 0
+
+    # Quita la información que se puede inferir de los roles y demás para evitar conflictos
+    def to_dict(self) -> dict:
+        d = super().to_dict()
+        attrs = d[str(self.id)]
+        attrs.pop("admin")
+        attrs.pop("salario")
+        attrs.pop("guild")
+        return d
 
     def write_to_json(self, path: str = "data/members.json"):
         super().write_to_json(path)
 
     @classmethod
     def read_from_json(cls, member: discord.Member):
-        obj = cls(member, Server.read_from_json(member.guild))
+        obj = cls(member)
         m = cls._read_from_json(obj=obj, path="data/members.json")
         if m is None:
-            s = Server.read_from_json(member.guild)
-            m = cls(member, s)
+            m = cls(member)
             m.write_to_json()
         return m
 
     # Método para hacer transacción de cupones
-    def modify_coupons(self, amount: int, guild: discord.Guild = None):
+    def modify_coupons(self, amount: int):
         self.cupones += amount
         self.write_to_json()
-        if guild:
-            self.cancel_member_task("refresh")
-            asyncio.create_task(refresh_list(guild), name=f"{self.id}-refresh")
+        cancel_global_task("refresh")
+        asyncio.create_task(refresh_list(self.guild), name=f"{self.id}-refresh")
 
+    # Método para cambiar de status de esclavo o senador honorario
     def change_status(self, tag, mode: bool, end: datetime.datetime | None = None):
         if mode:
             tag["status"] = True
@@ -125,6 +139,7 @@ class Member(Writeable):
             tag["end"] = 0
             self.write_to_json()
 
+    # Método para cancelar una tarea ligada a un miembro
     def cancel_member_task(self, tag: str):
         for task in asyncio.all_tasks():
             if task.get_name() == f"{self.id}-{tag}":
@@ -137,15 +152,15 @@ class Commission(Writeable):
     prompt: str
     reward: int
     taken: bool
-    msg: int
+    author: int
     artist: int
 
-    def __init__(self, id, prompt, reward):
+    def __init__(self, id, prompt, reward, author):
         super().__init__(id)
         self.prompt = prompt
         self.taken = False
         self.reward = reward
-        self.msg = 0
+        self.author = author
         self.artist = 0
 
     def write_to_json(self, path: str = "data/comisiones.json"):
@@ -153,8 +168,8 @@ class Commission(Writeable):
 
     @classmethod
     def read_from_json(cls, id: int):
-        obj = cls(id, '', 0)
-        c = cls._read_from_json(obj=obj, id=id, path="data/comisiones.json")
+        obj = cls(id, '', 0, 0)
+        c = cls._read_from_json(obj=obj, path="data/comisiones.json")
         return c
 
     def remove_from_json(self, path: str = "data/comisiones.json"):
@@ -162,9 +177,11 @@ class Commission(Writeable):
 
 
 # Función auxiliar para crear un JSON
-def init_file(path: str):
+def init_file(path: str, obj=None):
+    if obj is None:
+        obj = {}
     if os.path.isfile(path): return
-    write_json({}, path)
+    write_json(obj, path)
 
 # Función auxiliar para escribir al JSON
 def write_json(data, path: str):
@@ -203,3 +220,10 @@ async def refresh_list(guild: discord.Guild):
     if s.lista_cupones == 0: return
     msg = await guild.get_channel(s.canal_bancario).fetch_message(s.lista_cupones)
     await msg.edit(embeds=generate_list(guild))
+
+# Método auxiliar para cancelar una tarea de cualquier miembro
+def cancel_global_task(tag: str):
+    for task in asyncio.all_tasks():
+        if tag in task.get_name():
+            task.cancel()
+            break
