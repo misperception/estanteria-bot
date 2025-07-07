@@ -6,10 +6,10 @@ from views.persistent_view import PersistentView, remove_by_id, add_namespace
 class ArtistView(PersistentView):
     com_id: int # ID del mensaje de la comisión
     channel: discord.TextChannel # Canal de la comisión
-    parent_id: int
+    parent_id: str
 
-    def __init__(self, com_id: int, parent_id: int, channel: discord.TextChannel, view_id = None):
-        super().__init__(view_id)
+    def __init__(self, com_id: int, parent_id: str, channel: discord.TextChannel, id: str = None):
+        super().__init__(id)
         self.com_id = com_id
         self.channel = channel
         self.parent_id = parent_id
@@ -18,7 +18,7 @@ class ArtistView(PersistentView):
 
     def to_dict(self):
         d = super().to_dict()
-        d[str(self.view_id)].update({
+        d[self.id].update({
             "com_id": self.com_id,
             "channel": self.channel.id,
             "parent_id": self.parent_id
@@ -26,12 +26,12 @@ class ArtistView(PersistentView):
         return d
 
     @classmethod
-    def read_from_dict(cls, d: dict, id: int, bot: commands.Bot):
+    def read_from_dict(cls, d: dict, id: str, bot: commands.Bot):
         return cls(
             com_id=d["com_id"],
             parent_id=d["parent_id"],
             channel=bot.get_channel(d["channel"]),
-            view_id=id
+            id=id
         )
 
     @discord.ui.button(label="Enviar comisión", style=discord.ButtonStyle.green, custom_id='artview:send')
@@ -85,7 +85,7 @@ class ArtistView(PersistentView):
         message = await self.channel.fetch_message(com.id)
         embed = message.embeds[0]
         embed.remove_field(1)
-        view = CommissionView(com.id, self.parent.bot)
+        view = CommissionView(com.id, self.parent_id)
         await message.edit(content=message.content, embed=embed, view=view)
         # Borra el menú de acción del artista
         await interaction.message.delete()
@@ -95,10 +95,10 @@ class ArtistView(PersistentView):
 @add_namespace
 class CommissionView(PersistentView):
     msg_id: int # Id del mensaje
-    child_id: int | None
+    child_id: str | None
 
-    def __init__(self, msg_id, view_id=None):
-        super().__init__(view_id)
+    def __init__(self, msg_id, id: str = None):
+        super().__init__(id)
         self.msg_id = msg_id
         self.child_id = None
 
@@ -134,8 +134,8 @@ class CommissionView(PersistentView):
         button.disabled = True
         await interaction.message.edit(content=interaction.message.content, embed=embed, view=self)
 
-        view = ArtistView(com_id=com.msg_id, parent_id=self.view_id, channel=interaction.channel)
-        self.child_id = view.view_id
+        view = ArtistView(com_id=self.msg_id, parent_id=self.id, channel=interaction.channel)
+        self.child_id = view.id
         view.write_to_json()
         self.write_to_json()
 
@@ -144,16 +144,16 @@ class CommissionView(PersistentView):
 
     def to_dict(self):
         d = super().to_dict()
-        d[str(self.view_id)].update({
+        d[self.id].update({
             "msg_id": self.msg_id,
             "child_id": self.child_id
         })
         return d
 
     @classmethod
-    def read_from_dict(cls, d: dict, id: int, bot: commands.Bot):
+    def read_from_dict(cls, d: dict, id: str, bot: commands.Bot):
         return cls(
             msg_id=d["msg_id"],
-            view_id=id
+            id=id
         )
 

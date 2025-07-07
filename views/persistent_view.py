@@ -11,22 +11,21 @@ def add_namespace(cls):
     namespace.update(class_dict)
     return cls
 
-def remove_by_id(id: int):
+def remove_by_id(id: str):
     data = read_json("data/views.json")
-    data.pop(str(id))
+    data.pop(id)
     write_json(data, "data/views.json")
 
 class PersistentView(discord.ui.View):
     name: str
-    view_id: int
 
-    def __init__(self, view_id: int | None):
+    def __init__(self, id: str):
         super().__init__(timeout=None)
         self.name = type(self).__name__
-        self.view_id = view_id or getrandbits(32)
+        self.id = id or self.id
 
     def to_dict(self) -> dict:
-        d = {str(self.view_id): {"name": self.name}}
+        d = {self.id: {"name": self.name}}
         return d
 
     def write_to_json(self):
@@ -36,7 +35,7 @@ class PersistentView(discord.ui.View):
 
     def remove_from_json(self):
         data = read_json("data/views.json")
-        data.pop(str(self.view_id))
+        data.pop(self.id)
         write_json(data, "data/views.json")
 
     # Función de leer de diccionario de vista (para overriding)
