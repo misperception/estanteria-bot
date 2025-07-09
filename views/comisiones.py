@@ -1,8 +1,6 @@
 from lib.checks import *
-from views.persistent_view import PersistentView, remove_by_id, add_namespace
-
+from views.persistent_view import PersistentView, remove_by_id
 # Menú de acción del artista
-@add_namespace
 class ArtistView(PersistentView):
     com_id: int # ID del mensaje de la comisión
     channel: discord.TextChannel # Canal de la comisión
@@ -92,7 +90,6 @@ class ArtistView(PersistentView):
         self.remove_from_json()
 
 # Menú de acción de la comisión
-@add_namespace
 class CommissionView(PersistentView):
     msg_id: int # Id del mensaje
     child_id: str | None

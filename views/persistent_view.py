@@ -9,7 +9,6 @@ namespace = {}
 def add_namespace(cls):
     class_dict = {cls.__name__: cls}
     namespace.update(class_dict)
-    return cls
 
 def remove_by_id(id: str):
     data = read_json("data/views.json")
@@ -18,6 +17,10 @@ def remove_by_id(id: str):
 
 class PersistentView(discord.ui.View):
     name: str
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__()
+        add_namespace(cls)
 
     def __init__(self, id: str):
         super().__init__(timeout=None)
