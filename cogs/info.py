@@ -19,7 +19,8 @@ class Info(commands.Cog):
         )
         embed.set_author(name=self.bot.user.name, icon_url=self.bot.user.avatar.url if self.bot.user.avatar else "")
         embed.add_field(name="Versión", value=self.VERSION, inline=False)
-        embed.add_field(name="Ejecutándose desde", value=f"<t:{int(self.UP_DATE.timestamp())}:R>")
+        embed.add_field(name="Ejecutándose desde", value=f"<t:{int(self.UP_DATE.timestamp())}:R>", inline=False)
+        embed.add_field(name="Latencia", value=f"{round(self.bot.latency * 1000)} ms", inline=False)
         await ctx.reply(embed=embed, ephemeral=True)
 
     @info.command(name="miembro", description="Devuelve información sobre un usuario.")
