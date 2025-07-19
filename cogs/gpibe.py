@@ -1,15 +1,15 @@
-import discord, time, random
+import discord, time
+from random import getrandbits, choice
 from discord.ext import commands
 
-def init():
-    funny = 0
-    i = random.randint(1, 1000)
-    return funny, i
+def roll():
+    special = getrandbits(12)
+    return special
 
 class GPibe(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.funny, self.i = init()
+        self.threshold = roll()
         self.gpibes = ('https://tenor.com/view/gman-half-life-alyx-creepy-gif-16000932',
                        'https://tenor.com/view/gman-half-life-speech-bubble-reaction-mona-lisa-gif-26331942',
                        'https://tenor.com/view/half-life-half-life-2-g-man-gif-13054231949960000677',
@@ -18,11 +18,13 @@ class GPibe(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        if message.author != self.bot.user:
-            self.funny +=1
-        if self.funny == self.i:
-            self.funny, self.i = init()
-            await message.channel.send(self.gpibes[random.randint(0,len(self.gpibes)-1)], delete_after=2)
+        if message.author == self.bot.user:
+            return
+
+        chance = roll()
+        if chance == self.threshold:
+            self.threshold = roll()
+            await message.channel.send(choice(self.gpibes), delete_after=2)
 
 
 async def setup(bot):
