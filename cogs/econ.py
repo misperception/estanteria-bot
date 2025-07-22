@@ -3,6 +3,7 @@ from discord.ext import tasks
 import random, discord, views.comisiones
 
 
+
 class Cupones(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -17,7 +18,7 @@ class Cupones(commands.Cog):
     @owner_only()
     async def add_coupons(self, ctx: commands.Context, member: discord.Member, amount: int, mostrar: bool = True):
         m = Member.read_from_json(member)
-        m.modify_coupons(amount)
+        m.modify_coupons(amount, ctx.guild)
         if mostrar: await ctx.reply(
             f"{"Añadidos" if amount > 0 else "Retirados"} {abs(amount)} cupones {"a" if amount > 0 else "de"} la cuenta de {member.mention}")
         else: await ctx.reply("Hecho.", ephemeral=True, delete_after=2)
@@ -42,10 +43,9 @@ class Cupones(commands.Cog):
         if giver.cupones < amount: raise InsufficientCoupons
         gived = Member.read_from_json(member)
         giver.modify_coupons(-amount)
-        gived.modify_coupons(amount)
+        gived.modify_coupons(amount, ctx.guild)
         await ctx.reply(f"Transferido{"s" if amount > 1 else ""} {amount} cup{"ones" if amount > 1 else "ón"}"
                         + f" de la cuenta de {ctx.author.mention} a la cuenta de {member.mention}", ephemeral=True)
-
     # Comando que lista todos los cupones de los miembros
     @owner_only()
     @commands.hybrid_command(name="listar", description="Lista los cupones de todos los miembros del server.")
@@ -111,7 +111,7 @@ class Tienda(commands.Cog):
         s = Server.read_from_json(member.guild)
         # Cobramos la transacción
         user = Member.read_from_json(ctx.author)
-        user.modify_coupons(-3)
+        user.modify_coupons(-3, ctx.guild)
         # Iniciamos la fecha de hoy para saber la fecha de final de esclavitud
         time = datetime.datetime.now()
         # Comprobamos si el usuario ya es un esclavo para cargar la fecha de final
@@ -180,7 +180,7 @@ class Tienda(commands.Cog):
             return
         # Cobramos al usuario y le hacemos senador
         user = Member.read_from_json(ctx.author)
-        user.modify_coupons(-8)
+        user.modify_coupons(-8, ctx.guild)
         s.senadores_honorarios += 1
         s.write_to_json()
         m.change_status(m.senador, True, end=(datetime.datetime.now() + datetime.timedelta(days=1)))

@@ -121,7 +121,7 @@ class Member(Writeable):
         return m
 
     # Método para hacer transacción de cupones
-    def modify_coupons(self, amount: int):
+    def modify_coupons(self, amount: int, guild: discord.Guild = None):
         self.cupones += amount
         self.write_to_json()
         cancel_global_task("refresh")
