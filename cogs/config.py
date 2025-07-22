@@ -1,149 +1,78 @@
 from asyncio import sleep
-import discord.ui as ui
+
 from lib.checks import *
+import views.config
 
-# Desplegable de selección de rol
-class SelectRole(ui.RoleSelect):
-    def __init__(self, label, maxvals):
-        super().__init__(placeholder=label, max_values=maxvals, min_values=1)
-        self.default_values = []
+class Abort(Exception):
+    pass
 
-    async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
 
-# Desplegable de selección de canal
-class SelectChannel(ui.ChannelSelect):
-    def __init__(self, label, maxvals):
-        super().__init__(placeholder=label, max_values=maxvals, min_values=1)
+# Clase con métodos de configuración
+class _ConfigHelper:
+    server: Server
+    message: discord.Message
+    def __init__(self, server: Server, message: discord.Message):
+        self.server = server
+        self.message = message
 
-    async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-
-# Modal de selección de salario
-class SalarioModal(ui.Modal, title="Salario"):
-    def __init__(self, role_name):
-        super().__init__()
-        self.salario.label = f"Salario de {role_name}:"
-        self.abort = False
-
-    salario = ui.TextInput(label="WIP", style=discord.TextStyle.short, placeholder="1", default="1")
-
-    async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-
-    async def on_error(self, interaction: discord.Interaction, error):
-        self.abort = True
-        await interaction.response.defer(ephemeral=True)
-
-# Objeto genérico con botones de continuar y de cancelar
-class ViewObj(ui.View):
-    def __init__(self):
-        super().__init__()
-        self.abort = False
-
-    async def disable(self, interaction: discord.Interaction):
-        for child in self.children:
-            child.disabled = True
-        await interaction.message.edit(content=interaction.message.content, view=self)
-
-    @ui.button(label="Cancelar", style=discord.ButtonStyle.red, row=2)
-    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Cancelando configuración...", ephemeral=True, delete_after=2)
-        self.abort = True
-        await self.disable(interaction)
-        self.stop()
-
-    # Función auxiliar presente para overriding
-    async def _cont(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        await self.disable(interaction)
-        self.stop()
-
-    @ui.button(label="Continuar", style=discord.ButtonStyle.green, row=2)
-    async def cont(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self._cont(interaction)
-
-# Menú de selección de rol
-class SelectRoleView(ViewObj):
-    def __init__(self, label, maxvals=1):
-        super().__init__()
-        self.label = label
-        self.selection = SelectRole(label, maxvals)
-        self.add_item(self.selection)
-
-    async def _cont(self, interaction: discord.Interaction):
-        if not self.selection.values:
-            await interaction.response.send_message(InvalidSelection().response(), ephemeral=True)
+    # Método para el manejo de configuraciones
+    async def __handle(self, config):
+        await self.message.edit(content=f"{config.label}:\n", view=config)
+        await config.wait()
+        if config.abort:
+            raise Abort
+    # Método para la configuración de salario
+    async def salario(self):
+        config = views.config.SalarioView("Selecciona los salarios de los miembros")
+        await self.__handle(config)
+        self.server.sueldos = config.d
+    # Método para la configuración de roles de admin
+    async def admin(self):
+        config = views.config.SelectRoleView("Selecciona los roles de administrador", 25)
+        await self.__handle(config)
+        self.server.roles_admin = [val.id for val in config.selection.values]
+    # Método para la configuración del canal de tienda
+    async def tienda(self):
+        config = views.config.SelectChannelView("Selecciona el canal de tienda")
+        await self.__handle(config)
+        self.server.canal_tienda = config.selection.values[0].id
+    # Método para la configuración del canal bancario
+    async def bancario(self):
+        config = views.config.SelectChannelView("Selecciona el canal bancario")
+        await self.__handle(config)
+        self.server.canal_bancario = config.selection.values[0].id
+    # Método para la configuración del rol de senador honorario
+    async def senador(self):
+        config = views.config.SelectRoleView("Selecciona el rol de senador honorario")
+        await self.__handle(config)
+        self.server.rol_senador = config.selection.values[0].id
+    # Método para la configuración del rol de esclavo
+    async def esclavo(self):
+        config = views.config.SelectRoleView("Selecciona el rol de esclavo")
+        await self.__handle(config)
+        self.server.rol_esclavo = config.selection.values[0].id
+    # Método para la configuración del rol de artista
+    async def artista(self):
+        config = views.config.SelectRoleView("Selecciona el rol de artista")
+        await self.__handle(config)
+        self.server.rol_artista = config.selection.values[0].id
+    # Método de clase que envuelve una configuración para crear un nuevo comando de configuración
+    @classmethod
+    async def wrap(cls, ctx: commands.Context, fn):
+        server = Server.read_from_json(ctx.guild)
+        message = await ctx.reply("Iniciando configuración...")
+        cfg = cls(server, message)
+        await sleep(0.5)
+        try: await fn(self=cfg)
+        except Abort:
+            await message.delete()
             return
-        await super()._cont(interaction)
-
-# Menú de selección de canal
-class SelectChannelView(ViewObj):
-    def __init__(self, label, maxvals=1):
-        super().__init__()
-        self.label = label
-        self.selection = SelectChannel(label, maxvals)
-        self.add_item(self.selection)
-
-    async def _cont(self, interaction: discord.Interaction):
-        if not self.selection.values:
-            await interaction.response.send_message(InvalidSelection().response(), ephemeral=True)
-            return
-        await super()._cont(interaction)
-
-# Menú de configuración de salarios
-class SalarioView(ViewObj):
-    # Función auxiliar que inicializa el campo de selección de rol
-    def _init_field(self):
-        if hasattr(self, "rol"): self.remove_item(self.rol)
-        self.rol = SelectRole("Selecciona un rol", maxvals=1)
-        self.add_item(self.rol)
-
-    def __init__(self, label):
-        super().__init__()
-        self._init_field()
-        self.d = {}
-        self.label = label
-
-    # Función que añade un diccionario {id_rol: salario} al diccionario del menú y devuelve la selección
-    async def _add_to_d(self, interaction: discord.Interaction):
-        if not self.rol.values: raise InvalidSelection
-        rol = self.rol.values[0]
-        id = rol.id
-        modal = SalarioModal(rol.name)
-
-        await interaction.response.send_modal(modal)
-        await modal.wait()
-
-        d = {id: int(modal.salario.value)}
-        self._init_field() # Reinicia el campo de selección
-        self.d.update(d)
-        return rol, modal.salario.value # Devuelve el rol y el salario para estilizar el mensaje
-
-    # Botón que implementa la función anterior y actualiza el mensaje
-    @ui.button(label="Añadir salario", style=discord.ButtonStyle.blurple, row=2)
-    async def add_to_d(self, interaction: discord.Interaction, button: ui.Button):
-        try: rol, n = await self._add_to_d(interaction)
-        except InvalidSelection as e:
-            await interaction.response.send_message(e.response(), ephemeral=True)
-            return
-        x = lambda i: f"{rol.mention}: {i} Guydocup{"ón" if i==1 else "ones"}."
-        msg = interaction.message.content + "\n" + x(n)
-        await interaction.message.edit(content=msg, view=self)
-
-    # Sobrescritura de la función del botón continuar para obligar a escoger al menos un rol
-    async def _cont(self, interaction):
-        if self.d == {}:
-            try: await self._add_to_d(interaction)
-            except InvalidSelection as e:
-                await interaction.response.send_message(e.response(), ephemeral=True)
-                return
-            await interaction.response.defer(ephemeral=True)
-        await super()._cont(interaction)
+        await message.delete()
+        server.write_to_json()
+        await ctx.reply("Cambios realizados.")
 
 
-
-class Config(commands.Cog):
+class Configuracion(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
@@ -166,54 +95,77 @@ class Config(commands.Cog):
 
     @commands.hybrid_command(name="configuracion", description="Devuelve la configuración actual del servidor")
     @owner_only()
-    async def get_conf(self, ctx: commands.Context):
+    async def list_conf(self, ctx: commands.Context):
         server = Server.read_from_json(ctx.guild)
         embed = self._list_config(server, ctx)
         await ctx.reply(embed=embed)
 
-    # Qué asco me da este comando
-    @commands.hybrid_command(name="configurar", description="Configura los datos del servidor")
+    @commands.hybrid_group(name="configurar", fallback="servidor", description="Configura los datos del servidor")
     @owner_only()
     async def config(self, ctx: commands.Context):
-        configs = [SelectRoleView("Selecciona los roles de administrador", 25),
-                   SelectChannelView("Selecciona el canal de tienda"), SelectChannelView("Selecciona el canal bancario"),
-                   SalarioView("Selecciona los salarios de los miembros"), SelectRoleView("Selecciona el rol de senador honorario"),
-                   SelectRoleView("Selecciona el rol de esclavo"), SelectRoleView("Selecciona el rol de artista")]
         message = await ctx.reply("Iniciando configuración...")
         await sleep(0.5)
-
-        for cfg in configs: # Paso de configuración
-            await message.edit(content=f"{cfg.label}:\n", view=cfg)
-            await cfg.wait()
-            if cfg.abort:
-                await message.delete()
-                return
-
         # Creación del objeto servidor con la configuración dada
         server = Server(ctx.guild.id)
-        server.configurado = True
-        server.roles_admin = [val.id for val in configs[0].selection.values]
-        server.canal_tienda = configs[1].selection.values[0].id
-        server.canal_bancario = configs[2].selection.values[0].id
-        server.sueldos = configs[3].d
-        server.rol_senador = configs[4].selection.values[0].id
-        server.rol_esclavo = configs[5].selection.values[0].id
-        server.rol_artista = configs[6].selection.values[0].id
+        config = _ConfigHelper(server, message)
+        await config.admin()
+        await config.tienda()
+        await config.bancario()
+        await config.salario()
+        await config.senador()
+        await config.esclavo()
+        await config.artista()
 
-        confirm = ViewObj()
         # Embed con los cambios realizados
+        confirm = views.config.ViewObj()
         embed = self._list_config(server, ctx)
-        await message.edit(content="¿Continuar?", embed=embed, view=confirm)
+        await message.edit(content="¿Continuar con la configuración actual?", embed=embed, view=confirm)
         await confirm.wait()
         if confirm.abort:
             await message.delete()
             return
 
         # Finalización
+        server.configurado = True
         server.write_to_json()
         await message.delete()
-        await ctx.reply("Hecho.", ephemeral=True)
+        await ctx.reply("Configuración completada", ephemeral=True)
+
+    @config.command(name="salario", description="Configura los salarios")
+    @owner_only()
+    async def salario(self, ctx: commands.Context):
+        await _ConfigHelper.wrap(ctx=ctx, fn=_ConfigHelper.salario)
+
+    @config.command(name="admin", description="Configura los roles de admin")
+    @owner_only()
+    async def admin(self, ctx: commands.Context):
+        await _ConfigHelper.wrap(ctx=ctx, fn=_ConfigHelper.admin)
+
+    @config.command(name="canal_tienda", description="Configura el canal de tienda")
+    @owner_only()
+    async def tienda(self, ctx: commands.Context):
+        await _ConfigHelper.wrap(ctx=ctx, fn=_ConfigHelper.tienda)
+
+    @config.command(name="canal_bancario", description="Configura el canal bancario")
+    @owner_only()
+    async def bancario(self, ctx: commands.Context):
+        await _ConfigHelper.wrap(ctx=ctx, fn=_ConfigHelper.bancario)
+
+    @config.command(name="senador_honorario", description="Configura el rol de senador honorario")
+    @owner_only()
+    async def senador(self, ctx: commands.Context):
+        await _ConfigHelper.wrap(ctx=ctx, fn=_ConfigHelper.senador)
+
+    @config.command(name="esclavo", description="Configura el rol de esclavo")
+    @owner_only()
+    async def esclavo(self, ctx: commands.Context):
+        await _ConfigHelper.wrap(ctx=ctx, fn=_ConfigHelper.esclavo)
+
+    @config.command(name="artista", description="Configura el rol de artista")
+    @owner_only()
+    async def artista(self, ctx: commands.Context):
+        await _ConfigHelper.wrap(ctx=ctx, fn=_ConfigHelper.artista)
 
 
 async def setup(bot):
-    await bot.add_cog(Config(bot))
+    await bot.add_cog(Configuracion(bot))

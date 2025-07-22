@@ -1,115 +1,12 @@
 from lib.checks import *
-import random, discord
-
-# Menú de acción del artista
-class ArtistView(discord.ui.View):
-    com_id: int
-    channel: discord.TextChannel
-    def __init__(self, com_id: int, channel: discord.TextChannel, message: discord.Message):
-        super().__init__()
-        self.com_id = com_id
-        com = Commission.read_from_json(com_id)
-        self.channel = channel
-        self.add_item(discord.ui.Button(label="Ir a la comisión", style=discord.ButtonStyle.link, url=message.jump_url))
-
-    @discord.ui.button(label="Enviar comisión", style=discord.ButtonStyle.green)
-    async def send(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Inicia los datos del artista y la comisión
-        com = Commission.read_from_json(self.com_id)
-        artist = Member.read_from_json(interaction.user)
-        # Desactiva el botón de enviar y espera a que se envíe la comisión
-        button.disabled = True
-        await interaction.message.edit(content=interaction.message.content, view=self)
-
-        await self.channel.send(f"{interaction.user.mention}, responde a este mensaje con la comisión.", delete_after=10)
-        while not (self.channel.last_message is not None and
-                   self.channel.last_message.attachments != [] and
-                   "image" in self.channel.last_message.attachments[0].content_type and
-                   self.channel.last_message.author.id == artist.id):
-            await asyncio.sleep(1)
-
-        # Paga al artista el precio de la comisión y modifica el mensaje original de la comisión
-        artist.modify_coupons(com.reward, guild=self.channel.guild)
-        message = await self.channel.fetch_message(com.msg)
-        await message.reply("Comisión completada.", delete_after=2)
-        embed = message.embeds[0]
-        embed.set_footer(text="Comisión completada")
-        await message.edit(content=message.content, embed=embed, view=None)
-
-        # Elimina la comisión del JSON y el menú de acción
-        com.remove_from_json()
-        await interaction.message.delete()
-
-    @discord.ui.button(label="Abandonar comisión", style=discord.ButtonStyle.red)
-    async def abandon(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Elimina los datos del artista y lo guarda en el JSON
-        com = Commission.read_from_json(self.com_id)
-        com.taken = False
-        com.artist = 0
-        com.write_to_json()
-
-        # Responde al usuario
-        await interaction.response.send_message("Comisión abandonada.", delete_after=2)
-
-        # Elimina el campo de "Artista" y restablece el menú de la comisión
-        message = await self.channel.fetch_message(com.msg)
-        embed = message.embeds[0]
-        embed.remove_field(1)
-        view = CommissionView(com.id)
-        await message.edit(content=message.content, embed=embed, view=view)
-        # Borra el menú de acción del artista
-        await interaction.message.delete()
-# Menú de acción de la comisión
-class CommissionView(discord.ui.View):
-    def __init__(self, id):
-        super().__init__()
-        self.id = id
-
-    # Botón de cancelar comisión
-    @discord.ui.button(label="Cancelar comisión", style=discord.ButtonStyle.red)
-    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.id:
-            await interaction.response.send_message("Pero a ti qué te pasa, ¡esta comisión no es tuya!")
-        com = Commission.read_from_json(self.id)
-        user = Member.read_from_json(interaction.guild.get_member(self.id))
-        user.modify_coupons(com.reward, interaction.guild)
-        com.remove_from_json()
-        await interaction.response.send_message("Comisión cancelada.", ephemeral=True, delete_after=2)
-        await interaction.message.delete()
-        return
-
-    @discord.ui.button(label="Coger comisión", style=discord.ButtonStyle.blurple)
-    async def take_commission(self, interaction: discord.Interaction, button: discord.ui.Button):
-        server = Server.read_from_json(interaction.guild)
-        if not interaction.user.get_role(server.rol_artista):
-            await interaction.response.send_message(NotArtist().response(), ephemeral=True)
-            return
-
-        com = Commission.read_from_json(self.id)
-        com.artist = interaction.user.id
-        com.taken = True
-        com.write_to_json()
-
-        embed = interaction.message.embeds[0]
-        embed.add_field(name="Artista", value=interaction.user.mention)
-        button.disabled = True
-        await interaction.message.edit(content=interaction.message.content, embed=embed, view=self)
-
-        view = ArtistView(com.id, interaction.channel, interaction.message)
-        await interaction.response.send_message("Comisión cogida.", ephemeral=True, delete_after=2)
-        await interaction.user.send(f"Menú de acción de la comisión *'{com.prompt}'*:", view=view)
+from discord.ext import tasks
+import random, discord, views.comisiones
 
 
 
 class Cupones(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-
-    # Check de canal bancario
-    async def cog_check(self, ctx: commands.Context):
-        s = Server.read_from_json(ctx.guild)
-        if not ctx.channel.id == s.canal_bancario: raise InappropriateChannel
-        return True
 
     # Comando que permite añadir cupones
     @commands.hybrid_command(name="cuponizar", description="Añade cupones a un miembro.")
@@ -148,8 +45,7 @@ class Cupones(commands.Cog):
         giver.modify_coupons(-amount)
         gived.modify_coupons(amount, ctx.guild)
         await ctx.reply(f"Transferido{"s" if amount > 1 else ""} {amount} cup{"ones" if amount > 1 else "ón"}"
-                        + f" de la cuenta de {ctx.author.mention} a la cuenta de {member.mention}")
-
+                        + f" de la cuenta de {ctx.author.mention} a la cuenta de {member.mention}", ephemeral=True)
     # Comando que lista todos los cupones de los miembros
     @owner_only()
     @commands.hybrid_command(name="listar", description="Lista los cupones de todos los miembros del server.")
@@ -198,7 +94,7 @@ class Tienda(commands.Cog):
     async def cafe(self, ctx: commands.Context):
         fun_val = random.randint(1,100)
         victima = Member.read_from_json(ctx.author)
-        victima.modify_coupons(-1, ctx.guild)
+        victima.modify_coupons(-1)
         await ctx.send(f"{"En estos momentos la máquina de café está rota, por favor vuelva a intentarlo." 
         if fun_val == 100 else ":coffee:"}", ephemeral=True)
 
@@ -233,7 +129,7 @@ class Tienda(commands.Cog):
         asyncio.create_task(
             self._desesclavizar(member, time=(time - datetime.datetime.now()).total_seconds()),
             name=f"{member.id}-slave")
-        await ctx.reply(f"Ahora {member.mention} es un esclavo. Qué asco.")
+        await ctx.reply(f"Ahora {member.mention} es un esclavo. Qué asco.", ephemeral=True)
 
     # Función auxiliar asíncrona para desesclavizar, se puede llamar sola o ejecutar mediante asyncio
     async def _desesclavizar(self, member: discord.Member, time: float = 0):
@@ -258,9 +154,9 @@ class Tienda(commands.Cog):
             await ctx.reply("Ese ya está liberado, que no te enteras.", ephemeral=True)
             return
         user = Member.read_from_json(ctx.author)
-        user.modify_coupons(-3, ctx.guild)
+        user.modify_coupons(-3)
         await self._desesclavizar(member)
-        await ctx.reply(f"{member.mention} es libre, qué pena...")
+        await ctx.reply(f"{member.mention} es libre, qué pena...", ephemeral=True)
 
     @buy.command(name="senador", description="Adquiere y saborea derechos durante 1 día (solo 2 senadores a la vez).")
     @has_coupons(8)
@@ -275,7 +171,7 @@ class Tienda(commands.Cog):
         s = Server.read_from_json(member.guild)
         # Si hay ya 2 senadores honorarios, no puede haber más
         if not s.senadores_honorarios < 2:
-            await ctx.reply("Ya hay más que suficientes plebeyos con síndrome de superioridad, largo de aquí.")
+            await ctx.reply("Ya hay más que suficientes plebeyos con síndrome de superioridad, largo de aquí.", ephemeral=True)
             return
         val = m.senador["status"]
         # Si ya eres senador honorario, conténtate
@@ -293,7 +189,7 @@ class Tienda(commands.Cog):
         asyncio.create_task(
             self._desprivilegiar(member, time=datetime.timedelta(days=1).total_seconds()),
             name=f"{member.id}-senador")
-        await ctx.reply("Felicidades por tus derechos recién adquiridos.")
+        await ctx.reply("Felicidades por tus derechos recién adquiridos.", ephemeral=True)
 
     # Función auxiliar asíncrona para quitar privilegios de senador, se llama mediante asyncio
     async def _desprivilegiar(self, member: discord.Member, time: float):
@@ -307,27 +203,89 @@ class Tienda(commands.Cog):
 
     @buy.command(name="comisión", description="Soborna a un artista para que dibuje por ti. Precio variable.")
     @discord.app_commands.describe(price="Precio de la comisión.", prompt="Detalles de la comisión.")
-    @has_commission()
     async def comision(self, ctx: commands.Context, price: int, prompt: str):
         user = Member.read_from_json(ctx.author)
         if user.cupones < price: raise InsufficientCoupons
         if price <= 0: raise InvalidPrice
         # Cobramos la comisión temporalmente
-        user.modify_coupons(-price, ctx.guild)
-        com = Commission(user.id, prompt, price)
+        user.modify_coupons(-price)
 
         # Embed de la comisión
-        com_embed = discord.Embed(title=f"'{prompt}'", timestamp=datetime.datetime.now())
+        com_embed = discord.Embed(title=f"'{prompt}'", timestamp=datetime.datetime.now(), color=discord.Color.green())
         com_embed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar.url)
         com_embed.add_field(name="Precio", value=f"{price} Guydocup{"ones" if price > 1 else "ón"}")
 
         # Creamos el menú de acción de la comisión
-        view=CommissionView(user.id)
-        message = await ctx.send(embed=com_embed, view=view)
-        com.msg = message.id
+        message = await ctx.send(embed=com_embed)
+        view = views.comisiones.CommissionView(message.id)
+        view.write_to_json()
+        com = Commission(id=message.id, prompt=prompt, reward=price, author=user.id)
         com.write_to_json()
+
+        await message.edit(embed=com_embed, view=view)
         await ctx.reply("Comisión mandada.", ephemeral=True, delete_after=2)
+
+    @wip
+    @has_coupons(4)
+    @investigation_not_available()
+    @buy.command(name="investigación", description="Paga al DIC para que investiguen a alguien por ti (solo una investigación a la vez).")
+    @discord.app_commands.describe(member="Miembro a investigar.", reason="Motivo de la investigación.")
+    async def investigacion(self, ctx: commands.Context, member: discord.Member, reason: str):
+        if member == ctx.guild.owner:
+            await ctx.reply("No veo razones para investigar a este honorable individuo.")
+            return
+        comprador = Member.read_from_json(member)
+        comprador.modify_coupons(-4)
+        s = Server.read_from_json(ctx.guild)
+        s.investigaciones +=1
+        s.write_to_json()
+
+        embed = discord.Embed(
+            title="Investigación del DIC",
+            color=discord.Color.green(),
+            timestamp=datetime.datetime.now()
+        )
+        embed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar.url)
+        embed.add_field(name="Investigado", value=member.mention)
+        embed.add_field(name="Motivo de la investigación", value=reason)
+        await ctx.channel.send(embed=embed)
+        await ctx.reply("Investigación encargada.")
+
+
+class Salario(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.salario.start()
+
+    def cog_unload(self):
+        self.salario.cancel()
+
+    @tasks.loop(hours=7*24)
+    async def salario(self):
+        print("Pagando...")
+        servers = read_json("data/server.json")
+        members = read_json("data/members.json")
+        # Ineficiente si se tienen varios servidores, reemplazar por un O(n) con un atributo "guilds" en Member. Innecesario de momento
+        for guild_id in servers:
+            guild = self.bot.get_guild(int(guild_id))
+            for member_id in members:
+                member = guild.get_member(int(member_id))
+                if member is None: continue
+                m = Member.read_from_json(member)
+                m.modify_coupons(m.salario)
+            await refresh_list(guild)
+
+    @salario.before_loop
+    async def wait_for_time(self):
+        # Cuando se inicia el bot, espera al primer día de pago
+        now = datetime.datetime.now()
+        date = (now + datetime.timedelta(days=7-now.weekday())).date()
+        diff = datetime.datetime.combine(date=date, time=now.time().replace(hour=10, minute=0, second=0)) - now
+        await asyncio.sleep(diff.total_seconds())
+
+
 
 async def setup(bot):
     await bot.add_cog(Cupones(bot))
     await bot.add_cog(Tienda(bot))
+    await bot.add_cog(Salario(bot))
