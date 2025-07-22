@@ -225,7 +225,7 @@ class Tienda(commands.Cog):
         await message.edit(embed=com_embed, view=view)
         await ctx.reply("Comisión mandada.", ephemeral=True, delete_after=2)
 
-    @wip
+    @wip()
     @has_coupons(4)
     @investigation_not_available()
     @buy.command(name="investigación", description="Paga al DIC para que investiguen a alguien por ti (solo una investigación a la vez).")
