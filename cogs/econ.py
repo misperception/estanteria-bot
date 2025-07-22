@@ -211,28 +211,45 @@ class Tienda(commands.Cog):
         user.modify_coupons(-price)
 
         # Embed de la comisión
-        com_embed = discord.Embed(title=f"'{prompt}'", timestamp=datetime.datetime.now())
+        com_embed = discord.Embed(title=f"'{prompt}'", timestamp=datetime.datetime.now(), color=discord.Color.green())
         com_embed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar.url)
         com_embed.add_field(name="Precio", value=f"{price} Guydocup{"ones" if price > 1 else "ón"}")
 
         # Creamos el menú de acción de la comisión
         message = await ctx.send(embed=com_embed)
         view = views.comisiones.CommissionView(message.id)
+        view.write_to_json()
         com = Commission(id=message.id, prompt=prompt, reward=price, author=user.id)
         com.write_to_json()
 
         await message.edit(embed=com_embed, view=view)
         await ctx.reply("Comisión mandada.", ephemeral=True, delete_after=2)
 
+    @wip
     @has_coupons(4)
     @investigation_not_available()
     @buy.command(name="investigación", description="Paga al DIC para que investiguen a alguien por ti (solo una investigación a la vez).")
+    @discord.app_commands.describe(member="Miembro a investigar.", reason="Motivo de la investigación.")
     async def investigacion(self, ctx: commands.Context, member: discord.Member, reason: str):
         if member == ctx.guild.owner:
             await ctx.reply("No veo razones para investigar a este honorable individuo.")
             return
         comprador = Member.read_from_json(member)
         comprador.modify_coupons(-4)
+        s = Server.read_from_json(ctx.guild)
+        s.investigaciones +=1
+        s.write_to_json()
+
+        embed = discord.Embed(
+            title="Investigación del DIC",
+            color=discord.Color.green(),
+            timestamp=datetime.datetime.now()
+        )
+        embed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar.url)
+        embed.add_field(name="Investigado", value=member.mention)
+        embed.add_field(name="Motivo de la investigación", value=reason)
+        await ctx.channel.send(embed=embed)
+        await ctx.reply("Investigación encargada.")
 
 
 class Salario(commands.Cog):

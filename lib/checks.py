@@ -27,15 +27,15 @@ class NoConfig(ShelfError):
 class WIP(ShelfError):
     def response(self):
         return "OYE QUE ESTO NO ESTÁ ACABADO, TIRA POR AHÍ."
-class ExistentCommission(ShelfError):
-    def response(self):
-        return "Ya está bien de explotar artistas, ve a tocar hierba anda."
 class NotArtist(ShelfError):
     def response(self):
         return "Afortunadamente, no eres un artista."
 class InvalidPrice(ShelfError):
     def response(self):
         return "Basta ya de robarle a la gente, ponte a trabajar anda."
+class InvestigationExists(ShelfError):
+    def response(self):
+        return "El DIC está ya muy ocupado, ve a dar por culo a otra parte."
 
 # Checks
 ## Check de propietario
@@ -63,16 +63,15 @@ def has_coupons(cost):
 
     return commands.check(coupons)
 
-def has_commission():
-    def com_exists(ctx: commands.Context):
-        user = Member.read_from_json(ctx.author)
-        if Commission.read_from_json(user.id) is not None: raise ExistentCommission
-        return True
-    return commands.check(com_exists)
-
 ## Check de comando sin terminar
 def wip():
-    def err(ctx: commands.Context):
+    def err(ctx):
         raise WIP
     return commands.check(err)
 
+def investigation_not_available():
+    def err(ctx: commands.Context):
+        s = Server.read_from_json(ctx.guild)
+        if s.investigaciones > 0: raise InvestigationExists
+        return True
+    return commands.check(err)

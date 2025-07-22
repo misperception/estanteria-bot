@@ -39,14 +39,14 @@ class Mensajero(commands.Bot):
         for cog in cogs:
             try:
                 await self.load_extension(cog)
-                print(f"Módulo {cog} cargado con éxito.")
+                print('\033[92m' + f"╰ Módulo {cog} cargado con éxito." + '\033[0m')
             except commands.ExtensionFailed:
-                print(f"No se ha podido cargar el módulo {cog}")
+                print('\033[91m' + f"╰ No se ha podido cargar el módulo {cog}" + '\033[0m')
         print("Cargando comandos...")
         await self.tree.sync()
         print("Recargando menús...")
         self.refresh_views()
-        print("Bot Online")
+        print('\033[96m' + "Bot Online" + '\033[0m')
 
     async def on_resumed(self):
         self.refresh_views()

@@ -153,4 +153,3 @@ class CommissionView(PersistentView):
             msg_id=d["msg_id"],
             id=id
         )
-
